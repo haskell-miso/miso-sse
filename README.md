@@ -1,4 +1,4 @@
-# :ramen: miso-sse
+# :ramen: ⚡ miso-sse
 
 ## Build and run
 
