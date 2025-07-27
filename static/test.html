@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title> test </title>
+  </head>
+
+  <body>
+
+    <p> <span id="myspan"></span> </p>
+
+    <script>
+
+      // const evtSource = new EventSource("https://echo.websocket.org/.sse");
+      const evtSource = new EventSource("https://sse.dev/test");
+      // const evtSource = new EventSource("https://sse.tools.typinks.com/api/story");
+
+      evtSource.onerror = (err) => {
+        console.error("EventSource failed:", err);
+      };
+
+      evtSource.onmessage = function(event) {
+        const dataobj = JSON.parse(event.data);
+        console.log(dataobj);
+
+        myspan.innerHTML += dataobj.msg + " " + dataobj.now + "<br>";
+        // myspan.innerHTML += event.data + " ";
+      }
+
+    </script>
+
+  </body>
+</html>
+
+
