@@ -15,41 +15,67 @@
 -----------------------------------------------------------------------------
 module Main where
 -----------------------------------------------------------------------------
+import Data.Aeson
 import Miso
 import Miso.Lens
-import Miso.String
+import Miso.Lens.TH
+import Miso.String (MisoString, ms)
 -----------------------------------------------------------------------------
-data Action = ServerMsg MisoString
+data Action 
+  = ServerMessage Message
+  | ServerError
+  | ServerClose
   deriving (Show, Eq)
 -----------------------------------------------------------------------------
-type Model = MisoString
+data Message = Message MisoString Integer
+  deriving (Show, Eq)
+-----------------------------------------------------------------------------
+instance FromJSON Message where
+    parseJSON = withObject "Message" $ \v -> Message
+        <$> v .: "msg"
+        <*> v .: "now"
+-----------------------------------------------------------------------------
+newtype Model = Model { _mMessages :: [Message] }
+  deriving (Eq)
+-----------------------------------------------------------------------------
+makeLenses ''Model
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Action
-viewModel msg =
+viewModel model =
   div_
     []
-    [ h3_
-      []
-      [ text "SSE (Server-sent events) Example"
-      ]
-    , text (ms msg)
+    [ h3_ [] [ text "SSE (Server-sent events) example" ]
+    , p_ []
+        [ text "receiving events from "
+        , a_ [ href_ serverURI ] [ text serverURI ]
+        , text ":"
+        ]
+    , ul_ [] (map fmtMessage (model ^. mMessages))
     ]
+  where 
+    fmtMessage (Message msg' now') = 
+      li_ [] [ text (msg' <> " " <> ms (show now')) ]
+-----------------------------------------------------------------------------
+serverURI :: MisoString
+serverURI = "https://sse.dev/test"
 -----------------------------------------------------------------------------
 sse :: Component Model Action
-sse = (component "No event received" updateModel viewModel)
-  { subs = [ sseSub "https://echo.websocket.org/.sse" handleSseMsg ]
+sse = (component (Model []) updateModel viewModel)
+  { subs = [ sseSub serverURI handleSseMsg ]
   }
 -----------------------------------------------------------------------------
-handleSseMsg :: SSE MisoString -> Action
+handleSseMsg :: SSE Message -> Action
 handleSseMsg = \case
-  SSEMessage msg -> ServerMsg msg
-  SSEClose -> ServerMsg "SSE connection closed"
-  SSEError -> ServerMsg "SSE error"
+  SSEMessage msg -> ServerMessage msg
+  SSEClose -> ServerClose
+  SSEError -> ServerError
 -----------------------------------------------------------------------------
 updateModel :: Action -> Effect Model Action
-updateModel (ServerMsg msg) = do
-  io_ (consoleLog ("Received: " <> ms msg))
-  _id .= msg
+updateModel ServerClose = io_ (consoleLog "ServerClose")
+updateModel ServerError = io_ (consoleLog "ServerError")
+updateModel (ServerMessage msg) = do
+  io_ (consoleLog "ServerMessage")
+  mMessages %= (:) msg
 ----------------------------------------------------------------------------
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
