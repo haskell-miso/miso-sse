@@ -40,7 +40,7 @@ newtype Model = Model { _mMessages :: [Message] }
 -----------------------------------------------------------------------------
 makeLenses ''Model
 -----------------------------------------------------------------------------
-viewModel :: Model -> View Action
+viewModel :: Model -> View Model Action
 viewModel model =
   div_
     []
@@ -59,7 +59,7 @@ viewModel model =
 serverURI :: MisoString
 serverURI = "https://sse.dev/test"
 -----------------------------------------------------------------------------
-sse :: Component Model Action
+sse :: App Model Action
 sse = (component (Model []) updateModel viewModel)
   { subs = [ sseSub serverURI handleSseMsg ]
   }
@@ -70,7 +70,7 @@ handleSseMsg = \case
   SSEClose -> ServerClose
   SSEError -> ServerError
 -----------------------------------------------------------------------------
-updateModel :: Action -> Effect Model Action
+updateModel :: Action -> Transition Model Action
 updateModel ServerClose = io_ (consoleLog "ServerClose")
 updateModel ServerError = io_ (consoleLog "ServerError")
 updateModel (ServerMessage msg) = do
@@ -82,5 +82,5 @@ foreign export javascript "hs_start" main :: IO ()
 #endif
 -----------------------------------------------------------------------------
 main :: IO ()
-main = run (startComponent sse)
+main = run (startApp sse)
 -----------------------------------------------------------------------------
