@@ -20,8 +20,10 @@ executable app
     src
   main-is:
     Main.hs
+  other-modules:
+    SSE
   build-depends:
-    base, aeson, miso
+    base, aeson, miso, mtl, jsaddle, containers
   default-language:
     GHC2021
   default-extensions:

@@ -1,91 +1,107 @@
 -----------------------------------------------------------------------------
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE CPP                        #-}
 -----------------------------------------------------------------------------
--- |
--- Module      :  Main
--- Copyright   :  (C) 2016-2025 David M. Johnson
--- License     :  BSD3-style (see the file LICENSE)
--- Maintainer  :  David M. Johnson <code@dmj.io>
--- Stability   :  experimental
--- Portability :  non-portable
+module Main (main) where
 -----------------------------------------------------------------------------
-module Main where
+import           Data.IntSet (IntSet)
+import qualified Data.IntSet as IS
+import qualified Data.Map.Strict as M
 -----------------------------------------------------------------------------
-import Data.Aeson
-import Miso
-import Miso.Lens
-import Miso.Lens.TH
+import           Miso hiding (on)
+import           Miso.Lens
 -----------------------------------------------------------------------------
-data Action
-  = ServerMessage Message
-  | DecodeError MisoString
-  | ServerError JSVal
-  | ServerClose JSVal
+import           SSE
 -----------------------------------------------------------------------------
-data Message = Message MisoString Integer
-  deriving (Show, Eq)
------------------------------------------------------------------------------
-instance FromJSON Message where
-  parseJSON = withObject "Message" $ \v -> Message
-    <$> v .: "msg"
-    <*> v .: "now"
------------------------------------------------------------------------------
-newtype Model = Model { _mMessages :: [Message] }
-  deriving (Eq)
------------------------------------------------------------------------------
-makeLenses ''Model
------------------------------------------------------------------------------
-viewModel :: Model -> View Model Action
-viewModel model = div_ []
-  [ h3_
-    []
-    [ text "SSE (Server-sent events) example"
-    ]
-  , p_
-    []
-    [ text "receiving events from "
-    , a_ [ href_ serverURI ] [ text serverURI ]
-    , text ":"
-    ]
-  , ul_
-    []
-    (fmtMessage <$> model ^. mMessages)
-  ] where
-      fmtMessage (msg') = li_ [] [ text $ ms (show msg') ]
------------------------------------------------------------------------------
-serverURI :: MisoString
-serverURI = "https://sse.dev/test"
------------------------------------------------------------------------------
-sse :: App Model Action
-sse = (component (Model []) updateModel viewModel)
-  { subs =
-    [ sseSub serverURI ServerMessage DecodeError ServerClose ServerError
-    ]
-  }
------------------------------------------------------------------------------
-updateModel :: Action -> Transition Model Action
-updateModel (ServerClose o) = do
-  io_ $ do
-    consoleLog' o
-    consoleLog "ServerClose"
-updateModel (ServerError o) = do
-  io_ $ do
-    consoleLog "ServerError"
-    consoleLog' o
-updateModel (ServerMessage msg) = do
-  io_ (consoleLog "ServerMessage")
-  mMessages %= (++[msg])
-updateModel (DecodeError msg) =
-  io_ (consoleLog msg)
-----------------------------------------------------------------------------
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()
 #endif
 -----------------------------------------------------------------------------
+data Action
+  = AddEventSource
+  | Close Int
+  | NoOp
+-----------------------------------------------------------------------------
+data Model = Model
+  { _nextConnection :: Int
+  , _connections :: IntSet
+  } deriving Eq
+-----------------------------------------------------------------------------
+nextConnection :: Lens Model Int
+nextConnection = lens _nextConnection $ \r x -> r { _nextConnection = x }
+-----------------------------------------------------------------------------
+connections :: Lens Model IntSet
+connections = lens _connections $ \r x -> r { _connections = x }
+-----------------------------------------------------------------------------
 main :: IO ()
-main = run (startApp sse)
+main = run (startApp app)
+-----------------------------------------------------------------------------
+app :: App Model Action
+app = (component emptyModel update_ appView)
+  { events = M.singleton "click" False
+  , mailbox = checkMail Close (const NoOp)
+#ifndef WASM
+  , styles = [ Href "assets/style.css" ]
+#endif
+  } where
+     emptyModel = Model 0 mempty
+
+     update_ (Close x) =
+       connections %= IS.delete x
+     update_ AddEventSource = do
+       nextConnection += 1
+       connId <- use nextConnection
+       connections %= IS.insert connId
+     update_ NoOp =
+       pure ()
+-----------------------------------------------------------------------------
+githubStar :: View model action
+githubStar = iframe_
+    [ title_ "GitHub"
+    , height_ "30"
+    , width_ "170"
+    , textProp "scrolling" "0"
+    , textProp "frameborder" "0"
+    , src_
+      "https://ghbtns.com/github-btn.html?user=haskell-miso&repo=miso-sse&type=star&count=true&size=large"
+    ]
+    []
+-----------------------------------------------------------------------------
+appView :: Model -> View Model Action
+appView m =
+  div_
+  []
+  [ githubStar
+  , div_
+    [ class_ "container"
+    ]
+    [ h1_
+      []
+      [ "🍜 miso-sse ⚡"
+      ]
+    , div_
+      [ class_ "controls" ]
+      [ button_
+        [ class_ "btn btn-primary"
+        , id_ "add-sse-btn"
+        , onClick AddEventSource
+        ]
+        [ "Add new EventSource"
+        ]
+      ]
+    , div_
+      [ class_ "sse-container"
+      , id_ "sse-container"
+      ]
+      [ div_ [ key_ connId ] +> sseComponent connId
+      | connId <- IS.toList (m ^. connections)
+      ]
+    ]
+  ]
 -----------------------------------------------------------------------------
