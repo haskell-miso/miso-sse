@@ -12,8 +12,8 @@
 -----------------------------------------------------------------------------
 module SSE (sseComponent) where
 -----------------------------------------------------------------------------
+import           Data.Aeson (encode, Value)
 import           GHC.Generics
-import           Language.Javascript.JSaddle (fromJSValUnchecked)
 -----------------------------------------------------------------------------
 import           Miso hiding (on)
 import           Miso.EventSource
@@ -35,8 +35,8 @@ instance ToMisoString Origin where
 -----------------------------------------------------------------------------
 data Action
   = OnOpen EventSource
-  | OnMessage JSVal
-  | OnError JSVal
+  | OnMessage (Payload Value)
+  | OnError MisoString
   | Append Message
   | Connect
   | Disconnect
@@ -80,19 +80,28 @@ sseComponent box =
       OnOpen connection -> do
         eventSource .= connection
         connected .= True
-      OnMessage message ->
-        io $ do
-          value :: MisoString <- fromJSValUnchecked message
-          date <- newDate
-          dateString <- date & toLocaleString
-          pure $ Append (Message dateString value SERVER)
+      OnMessage payload ->
+        case payload of
+          TEXT message ->
+            io $ do
+              date <- newDate
+              dateString <- date & toLocaleString
+              pure $ Append (Message dateString message SERVER)
+          JSON message ->
+            io $ do
+              let value = ms (encode message)
+              date <- newDate
+              dateString <- date & toLocaleString
+              pure $ Append (Message dateString value SERVER)
+          _ ->
+            io_ (consoleError "Unsupported type received")
       Append message ->
         received %= (message :)
       OnError err -> do
         connected .= False
         io_ $ do
           consoleLog "Error received"
-          consoleLog' err
+          consoleLog err
       NoOp ->
         pure ()
       CloseBox ->
