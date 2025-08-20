@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module SSE (sseComponent) where
 -----------------------------------------------------------------------------
-import           Data.Aeson (encode, Value)
+import           Data.Aeson (FromJSON, ToJSON)
 import           GHC.Generics
 -----------------------------------------------------------------------------
 import           Miso hiding (on)
@@ -27,6 +27,15 @@ data Message
   , origin :: Origin
   } deriving (Eq, Show, Generic)
 -----------------------------------------------------------------------------
+data ServerMessage
+  = ServerMessage
+  { msg :: MisoString
+  , now :: Double
+  , sse_dev :: MisoString
+  , testing :: Bool
+  } deriving (Show, Eq, Generic)
+    deriving anyclass (FromJSON, ToJSON)
+-----------------------------------------------------------------------------
 data Origin = CLIENT | SYSTEM | SERVER
   deriving (Eq, Show, Generic)
 -----------------------------------------------------------------------------
@@ -35,7 +44,7 @@ instance ToMisoString Origin where
 -----------------------------------------------------------------------------
 data Action
   = OnOpen EventSource
-  | OnMessage (Payload Value)
+  | OnMessage ServerMessage
   | OnError MisoString
   | Append Message
   | Connect
@@ -75,26 +84,17 @@ sseComponent box =
   where
     updateModel = \case
       Connect ->
-        connect "https://sse.dev/test"
+        connectJSON "https://sse.dev/test"
           OnOpen OnMessage OnError
       OnOpen connection -> do
         eventSource .= connection
         connected .= True
-      OnMessage payload ->
-        case payload of
-          TEXT message ->
-            io $ do
-              date <- newDate
-              dateString <- date & toLocaleString
-              pure $ Append (Message dateString message SERVER)
-          JSON message ->
-            io $ do
-              let value = ms (encode message)
-              date <- newDate
-              dateString <- date & toLocaleString
-              pure $ Append (Message dateString value SERVER)
-          _ ->
-            io_ (consoleError "Unsupported type received")
+      OnMessage message ->
+        io $ do
+          let value = ms (show message)
+          date <- newDate
+          dateString <- date & toLocaleString
+          pure $ Append (Message dateString value SERVER)
       Append message ->
         received %= (message :)
       OnError err -> do
