@@ -18,6 +18,8 @@ import           GHC.Generics
 import           Miso hiding (on)
 import           Miso.EventSource
 import           Miso.Lens
+import           Miso.Html hiding (title_)
+import           Miso.Html.Property
 import           Miso.String (ToMisoString)
 -----------------------------------------------------------------------------
 data Message

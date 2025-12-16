@@ -15,6 +15,8 @@ import qualified Data.IntSet as IS
 import qualified Data.Map.Strict as M
 -----------------------------------------------------------------------------
 import           Miso hiding (on)
+import           Miso.Html hiding (title_)
+import           Miso.Html.Property
 import           Miso.Lens
 import           SSE
 -----------------------------------------------------------------------------
@@ -43,8 +45,7 @@ main = run (startApp app)
 -----------------------------------------------------------------------------
 app :: App Model Action
 app = (component emptyModel update_ appView)
-  { events = M.singleton "click" False
-  , mailbox = checkMail Close (const NoOp)
+  { mailbox = checkMail Close (const NoOp)
 #ifndef WASM
   , styles = [ Href "assets/style.css" ]
 #endif
@@ -98,7 +99,7 @@ appView m =
       [ class_ "sse-container"
       , id_ "sse-container"
       ]
-      [ div_ [ key_ connId ] +> sseComponent connId
+      [ div_ [ key_ connId ] [ mount (sseComponent connId) ]
       | connId <- IS.toList (m ^. connections)
       ]
     ]
