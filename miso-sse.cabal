@@ -23,7 +23,7 @@ executable app
   other-modules:
     SSE
   build-depends:
-    base, aeson, miso, mtl, jsaddle, containers
+    base, aeson, miso, mtl, containers
   default-language:
     GHC2021
   default-extensions:
