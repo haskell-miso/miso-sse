@@ -12,10 +12,10 @@
 -----------------------------------------------------------------------------
 module SSE (sseComponent) where
 -----------------------------------------------------------------------------
-import           Data.Aeson (FromJSON, ToJSON)
 import           GHC.Generics
 -----------------------------------------------------------------------------
 import           Miso hiding (on)
+import           Miso.JSON (FromJSON, ToJSON)
 import           Miso.EventSource
 import           Miso.Lens
 import           Miso.Html hiding (title_)
