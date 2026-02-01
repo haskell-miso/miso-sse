@@ -79,10 +79,7 @@ emptyModel :: Int -> Model
 emptyModel = Model mempty [] False emptyEventSource
 -----------------------------------------------------------------------------
 sseComponent :: Int -> Component parent Model Action
-sseComponent box =
-  (component (emptyModel box) updateModel viewModel)
-    { events = defaultEvents <> keyboardEvents
-    }
+sseComponent box = component (emptyModel box) updateModel viewModel
   where
     updateModel = \case
       Connect ->

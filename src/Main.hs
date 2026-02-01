@@ -40,7 +40,7 @@ connections :: Lens Model IntSet
 connections = lens _connections $ \r x -> r { _connections = x }
 -----------------------------------------------------------------------------
 main :: IO ()
-main = run (startApp app)
+main = startApp (defaultEvents <> keyboardEvents) app
 -----------------------------------------------------------------------------
 app :: App Model Action
 app = (component emptyModel update_ appView)
@@ -50,7 +50,6 @@ app = (component emptyModel update_ appView)
 #endif
   } where
      emptyModel = Model 0 mempty
-
      update_ (Close x) =
        connections %= IS.delete x
      update_ AddEventSource = do
@@ -98,7 +97,7 @@ appView m =
       [ class_ "sse-container"
       , id_ "sse-container"
       ]
-      [ div_ [ key_ connId ] [ mount (sseComponent connId) ]
+      [ div_ [ key_ connId ] [ mount_ (sseComponent connId) ]
       | connId <- IS.toList (m ^. connections)
       ]
     ]
