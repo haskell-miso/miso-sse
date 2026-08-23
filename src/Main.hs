@@ -42,11 +42,11 @@ connections = lens _connections $ \r x -> r { _connections = x }
 main :: IO ()
 main = startApp (defaultEvents <> keyboardEvents) app
 -----------------------------------------------------------------------------
-app :: App Model Action
-app = (component emptyModel update_ appView)
+app :: Component () () Model Action
+app = (component emptyModel update_ (\_ _ -> appView))
   { mailbox = checkMail Close (const NoOp)
 #ifndef WASM
-  , styles = [ Href "assets/style.css" ]
+  , styles = [ Href "assets/style.css" True ]
 #endif
   } where
      emptyModel = Model 0 mempty
@@ -59,7 +59,7 @@ app = (component emptyModel update_ appView)
      update_ NoOp =
        pure ()
 -----------------------------------------------------------------------------
-githubStar :: View model action
+githubStar :: View context model action
 githubStar = iframe_
     [ title_ "GitHub"
     , height_ "30"
@@ -71,7 +71,7 @@ githubStar = iframe_
     ]
     []
 -----------------------------------------------------------------------------
-appView :: Model -> View Model Action
+appView :: Model -> View () Model Action
 appView m = vfrag
   [ githubStar
   , div_

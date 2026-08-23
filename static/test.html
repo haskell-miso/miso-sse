@@ -13,7 +13,7 @@
     <script>
 
       // const evtSource = new EventSource("https://echo.websocket.org/.sse");
-      const evtSource = new EventSource("https://sse.dev/test");
+      const evtSource = new EventSource("https://stream.wikimedia.org/v2/stream/page-create");
       // const evtSource = new EventSource("https://sse.tools.typinks.com/api/story");
 
       evtSource.onerror = (err) => {
@@ -24,7 +24,7 @@
         const dataobj = JSON.parse(event.data);
         console.log(dataobj);
 
-        myspan.innerHTML += dataobj.msg + " " + dataobj.now + "<br>";
+        myspan.innerHTML += dataobj.database + " " + dataobj.page_title + " (" + dataobj.performer.user_text + ")" + "<br>";
         // myspan.innerHTML += event.data + " ";
       }
 

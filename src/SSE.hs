@@ -29,14 +29,25 @@ data Message
   , origin :: Origin
   } deriving (Eq, Show, Generic)
 -----------------------------------------------------------------------------
+-- | A subset of the Wikimedia @page-create@ event stream payload
+-- (roughly one event per second across all Wikimedia projects).
+-- See https://stream.wikimedia.org/?doc#/streams/get_v2_stream_page_create
 data ServerMessage
   = ServerMessage
-  { msg :: MisoString
-  , now :: Double
-  , sse_dev :: MisoString
-  , testing :: Bool
+  { database :: MisoString
+  , page_title :: MisoString
+  , page_id :: Int
+  , rev_timestamp :: MisoString
   } deriving (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)
+-----------------------------------------------------------------------------
+renderServerMessage :: ServerMessage -> MisoString
+renderServerMessage ServerMessage {..} =
+  database <> ": \"" <> page_title <> "\" (page " <> ms page_id <> ") @ " <> rev_timestamp
+-----------------------------------------------------------------------------
+-- | Maximum number of messages kept per box
+maxMessages :: Int
+maxMessages = 100
 -----------------------------------------------------------------------------
 data Origin = CLIENT | SYSTEM | SERVER
   deriving (Eq, Show, Generic)
@@ -78,24 +89,24 @@ boxId = lens _boxId $ \r x -> r { _boxId = x }
 emptyModel :: Int -> Model
 emptyModel = Model mempty [] False emptyEventSource
 -----------------------------------------------------------------------------
-sseComponent :: Int -> Component parent Model Action
-sseComponent box = component (emptyModel box) updateModel viewModel
+sseComponent :: Int -> Component () () Model Action
+sseComponent box = component (emptyModel box) updateModel (\_ _ -> viewModel)
   where
     updateModel = \case
       Connect ->
-        connectJSON "https://sse.dev/test"
+        connectJSON "https://stream.wikimedia.org/v2/stream/page-create"
           OnOpen OnMessage OnError
       OnOpen connection -> do
         eventSource .= connection
         connected .= True
       OnMessage message ->
         io $ do
-          let value = ms (show message)
+          let value = renderServerMessage message
           date <- newDate
           dateString <- date & toLocaleString
           pure $ Append (Message dateString value SERVER)
       Append message ->
-        received %= (message :)
+        received %= take maxMessages . (message :)
       OnError err -> do
         connected .= False
         io_ $ do
@@ -116,7 +127,7 @@ sseComponent box = component (emptyModel box) updateModel viewModel
       Clear ->
         received .= []
 -----------------------------------------------------------------------------
-viewModel :: Model -> View Model Action
+viewModel :: Model -> View () Model Action
 viewModel m =
   div_
   [ className "sse-box" ]
@@ -184,7 +195,7 @@ viewModel m =
       else messageHeader (m ^. received)
     ]
 -----------------------------------------------------------------------------
-messageHeader :: [Message] -> [ View model action ]
+messageHeader :: [Message] -> [ View context model action ]
 messageHeader messages = concat
   [ [ div_
       [ class_ "message-header" ]
